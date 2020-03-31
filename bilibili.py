@@ -11,12 +11,15 @@ from tkinter import scrolledtext
 from tkinter.simpledialog import *
 import re
 import subprocess
+from index_queue import IndexQueue
+from PyQt5.QtCore import QObject, pyqtSignal
 
 
 old_list = []
 #创建一个old_list列表用于辅助后面的text_danmu方法提取新消息
 class Danmu():
 #定义一个Danmu类
+    tip_label = {'text':''}
     def __init__(self):
         self.url = "https://api.live.bilibili.com/ajax/msg"
         self.headers ={
@@ -31,7 +34,7 @@ class Danmu():
             "visit_id":""
             }
         self.blacklist = []
-        self.song_queue = Queue()
+        self.song_queue = IndexQueue()
         self.qq_music = Music_tx()
         play_thread = Thread(target=self.play)
         play_thread.setDaemon(True)
@@ -41,15 +44,16 @@ class Danmu():
         gui_thread.setDaemon(True)
         gui_thread.start()
 
-        self.app = Tk()
-        self.app.title('点歌姬-普通的函数')
-        self.app.geometry('300x130')
+        # self.app = Tk()
+        # self.app.title('点歌姬-普通的函数')
+        # self.app.geometry('300x130')
+        #
+        # self.font = tf.Font(size=16, weight='normal')
+        # self.create_components()
+        # self.place_components()
+        #
+        # self.app.mainloop()
 
-        self.font = tf.Font(size=16, weight='normal')
-        self.create_components()
-        self.place_components()
-
-        self.app.mainloop()
 
         #在 __init__方法中先定义好要使用的请求url,请求头，和请求参数
     def speak_text(self,text):
@@ -123,6 +127,9 @@ class Danmu():
 
     def play(self):
         while 1:
+            if self.song_queue.isEmpty():
+                time.sleep(1)
+                continue
             song_name = self.song_queue.get()
             print('正在播放:', song_name)
             self.tip_label['text'] = '正在播放:' + song_name
