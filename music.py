@@ -3,6 +3,7 @@ import requests
 import json
 import urllib
 import sys, os
+import subprocess
 
 
 class Music_tx():
@@ -43,29 +44,35 @@ class Music_tx():
                 os.mkdir(file_path + 'mp3')
             file_path = os.path.dirname(os.path.abspath(__file__)) + '\\mp3\\'
         path = ''
-        for data in music_list:
-            song_MediaMids.append(data['file']['strMediaMid'])
-            song_mids.append(data['mid'])
-            song_titles.append(data['title'])
-            song_singers.append(data['singer'][0]['name'])
-            song_albumns.append(data['album']['name'])
-            song_id.append(data['id'])
-            music_url.append(self.get_play_url(data['mid'], data['file']['strMediaMid']))
-            print('正在下载:', data['title'], '......')
-            url = self.get_play_url(data['mid'], data['file']['strMediaMid'])
-            if os.path.isfile(file_path + data['title'] + '-' + data['singer'][0]['name'] + '.m4a'):
-                num += 1
-                path = file_path + data['title'] + '-' + data['singer'][0]['name'] + str(num) + '.m4a'
-            else:
-                path = file_path + data['title'] + '-' + data['singer'][0]['name'] + '.m4a'
-            print(url)
-            try:
-                urllib.request.urlretrieve(url, path, reporthook=self._progress)
-                print('下载' + data['title'] + '成功')
-                os.system('.\\ffplay -nodisp -autoexit ' + '\"' + path + '\"')
-            except Exception:
-                print('下载' + data['title'] + '失败')
-                print(Exception)
+        try:
+            for data in music_list:
+                song_MediaMids.append(data['file']['strMediaMid'])
+                song_mids.append(data['mid'])
+                song_titles.append(data['title'])
+                song_singers.append(data['singer'][0]['name'])
+                song_albumns.append(data['album']['name'])
+                song_id.append(data['id'])
+                music_url.append(self.get_play_url(data['mid'], data['file']['strMediaMid']))
+                print('正在下载:', data['title'], '......')
+                url = self.get_play_url(data['mid'], data['file']['strMediaMid'])
+                if os.path.isfile(file_path + data['title'] + '-' + data['singer'][0]['name'] + '.m4a'):
+                    num += 1
+                    path = file_path + data['title'] + '-' + data['singer'][0]['name'] + str(num) + '.m4a'
+                else:
+                    path = file_path + data['title'] + '-' + data['singer'][0]['name'] + '.m4a'
+                print(url)
+                try:
+                    urllib.request.urlretrieve(url, path, reporthook=self._progress)
+                    print('下载' + data['title'] + '成功')
+                    mp3_path = self.change_volume(path)
+
+                    os.system('.\\ffplay -nodisp -autoexit ' + '\"' + mp3_path + '\"')
+                    break
+                except Exception:
+                    print('下载' + data['title'] + '失败')
+                    print(Exception)
+        except Exception:
+            pass
 
 
     # 获取播放地址
@@ -91,15 +98,30 @@ class Music_tx():
         sys.stdout.write('\r>> 已下载: %.1f%%' % (float(block_num * block_size) / float(total_size) * 100.0))
         sys.stdout.flush()
 
+    def get_song_volume(self, path):
+        cmd = 'ffmpeg -i ' + '\"' + path + '\"' + ' -af \"volumedetect\" -f null NUL'
+        result = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        result = str(result)
+        result = result[result.find('mean_volume'):]
+        result = result[: result.find('\\r\\n')]
+        result = result[len('mean_volume: '):]
+        result = float(result[: result.find(' ')])
+        result = -15 - result
+        result = str(round(result, 3)) + ' dB'
+        return result
+
+    def change_volume(self, path):
+        volume = self.get_song_volume(path)
+        output_path = path.replace('.m4a', '.mp3')
+        print('.\\ffmpeg -i ' + '\"' + path + '\"' + ' -af \"volume=' + volume + '\" ' +
+                  '\"' + output_path + '\"')
+        os.system('.\\ffmpeg -i ' + '\"' + path + '\"' + ' -af \"volume=' + volume + '\" ' +
+                  '\"' + output_path + '\"')
+        return output_path
+
 
 if __name__ == '__main__':
     qq_music = Music_tx()
-    qq_music.qq_music('极乐净土')
-
-
-
-
-
-
-
-
+    # qq_music.qq_music('she is my sin')
+    qq_music.qq_music('告白气球 周杰伦')
+    # print(qq_music.get_song_volume('mp3\\She Is My Sin-Nightwish.m4a'))

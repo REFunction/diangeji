@@ -5,6 +5,12 @@ from music import Music_tx
 from queue import Queue
 from threading import Thread
 import os
+from tkinter import *
+import tkinter.font as tf
+from tkinter import scrolledtext
+from tkinter.simpledialog import *
+import re
+import subprocess
 
 
 old_list = []
@@ -19,16 +25,32 @@ class Danmu():
             # "Referer": "https://live.bilibili.com/1111?visit_id=847swo7d59s0"
             }
         self.data = {
-            "roomid":'21748664', #  彪哥直播间 21197548
+            "roomid":'21197548', #  彪哥直播间 21197548
             "csrf_token":"",
             "csrf":"",	
             "visit_id":""
             }
+        self.blacklist = []
         self.song_queue = Queue()
         self.qq_music = Music_tx()
         play_thread = Thread(target=self.play)
         play_thread.setDaemon(True)
         play_thread.start()
+
+        gui_thread = Thread(target=self.listen_danmu)
+        gui_thread.setDaemon(True)
+        gui_thread.start()
+
+        self.app = Tk()
+        self.app.title('点歌姬-普通的函数')
+        self.app.geometry('300x130')
+
+        self.font = tf.Font(size=16, weight='normal')
+        self.create_components()
+        self.place_components()
+
+        self.app.mainloop()
+
         #在 __init__方法中先定义好要使用的请求url,请求头，和请求参数
     def speak_text(self,text):
     #定义一个speak_text方法，并创建形参text，用于作为接下来读取的文字
@@ -36,6 +58,23 @@ class Danmu():
         #创建发声对象
         speak.Speak(text)
         #使用发生对象读取文字
+
+
+    def get_blacklist(self, path):
+        if not os.path.isfile(path):
+            print(path, '不存在')
+            file = open(path, 'w', encoding='utf-8')
+            file.close()
+        file = open(path, 'r', encoding='utf-8')
+        self.blacklist = file.read().split('\n')
+        file.close()
+
+
+    def is_in_blacklist(self, song_name):
+        for ban_name in self.blacklist:
+            if len(re.findall(song_name, ban_name, flags=re.IGNORECASE)) > 0:
+                return True
+        return False
         
     def text_danmu(self,html):
     #创建一个text_danmu方法，用于提取弹幕信息
@@ -68,7 +107,9 @@ class Danmu():
                     else:
                         if temp_list[text_number-1][0:3] == '点歌 ':
                             song_name = temp_list[text_number-1][3:]
-                            self.song_queue.put(song_name)
+                            self.get_blacklist('blacklist.txt')
+                            if not self.is_in_blacklist(song_name):
+                                self.song_queue.put(song_name)
                         # self.speak_text(temp_list[text_number-1])
                     #尝试打印temp_list指定索引的内容，如果报错则跳过
                     #否则调用speak_text方法，进行文字转语言
@@ -83,16 +124,54 @@ class Danmu():
     def play(self):
         while 1:
             song_name = self.song_queue.get()
-            os.system('del /Q mp3\\*')
             print('正在播放:', song_name)
+            self.tip_label['text'] = '正在播放:' + song_name
             self.qq_music.qq_music(song_name)
+            self.tip_label['text'] = '没有歌曲播放'
+            self.clear_mp3_dir()
+
+    def clear_mp3_dir(self):
+        filenames = os.listdir('mp3')
+        for filename in filenames:
+            path = 'mp3/' + filename
+            os.remove(path)
+
+    def pause(self):
+        os.system('.\pssuspend64.exe ffplay.exe')
+
+    def recover(self):
+        os.system('.\pssuspend64.exe -r ffplay.exe')
+
+    def on_click_pause_button(self):
+        if self.tip_label['text'] == '没有歌曲播放':
+            return
+        if self.pause_button['text'] == '暂停':
+            self.pause_button['text'] = '播放'
+            self.pause()
+        else:
+            self.pause_button['text'] = '暂停'
+            self.recover()
+
+    def create_components(self):
+        self.pause_button = Button(self.app,
+                            text='暂停',
+                            command=self.on_click_pause_button,
+                            width=10)
+        self.tip_label = Label(self.app, text='没有歌曲播放', width=30)
+
+    def place_components(self):
+        self.pause_button.place(x=30, y=10)
+        self.tip_label.place(x=10, y=50)
+
+    def listen_danmu(self):
+        while True:
+            self.get_danmu()
+            time.sleep(3)
+            #每三秒钟调用一个bzhan实例的get_danmu方法
+
 
 
 if __name__ == '__main__':
     danmu = Danmu()
-    #创建一个bzhan实例
-    while True:
-        danmu.get_danmu()
-        time.sleep(3)
-        #每三秒钟调用一个bzhan实例的get_danmu方法
+
 
